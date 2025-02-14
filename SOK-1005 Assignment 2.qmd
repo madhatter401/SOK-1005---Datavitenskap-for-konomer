@@ -1,0 +1,195 @@
+---
+title: "Sok-1005 Assignment 2"
+author: "Sigurd Egeberg"
+format: html
+editor: visual
+---
+
+```{r}
+library(readr)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(tidyverse)
+
+df <- read_csv("https://raw.githubusercontent.com/uit-sok-1005-v23/uit-sok-1005-v23.github.io/main/storedata.csv")
+
+colnames(df)
+str(df)
+head(df)
+unique(df$Region)
+unique(df$Customer_Segment)
+summary(df$Order_Date)
+
+# Convert the date column (assuming it is named "Order_Date")
+df <- df %>%
+  mutate(Year = year(Order_Date),
+         Month = month(Order_Date, label = TRUE))  # Extract year and month
+
+# Filter for last 3 months of 2017, Region 1 & 9, and Customer_Segment: Corporate & Consumer
+filtered_df <- df %>%
+  filter(Year == 2017,
+         Month %in% c("Oct", "Nov", "Dec"),
+         Region %in% c("Region 1", "Region 9"),
+         Customer_Segment %in% c("Corporate", "Consumer"))
+
+# Summarize sales per month
+table_1 <- filtered_df %>%
+  group_by(Region, Customer_Segment, Month) %>%
+  summarise(Total_Sales = sum(Sales, na.rm = TRUE)) %>%
+  arrange(Region, Customer_Segment, Month)
+
+
+
+
+```
+
+```{r}
+
+
+# Filter for Region 1 and Region 13 in 2015, 2016, 2017
+filtered_df2 <- df %>%
+  filter(Region %in% c("Region 1", "Region 13"),
+         Year %in% c(2015, 2016, 2017)) 
+
+# Summarize sales per month
+monthly_sales <- filtered_df2 %>%
+  group_by(Month, Region) %>%
+  summarise(Total_Sales = sum(Sales, na.rm = TRUE)) %>%
+  arrange(Month)
+
+# Plot
+ggplot(monthly_sales, aes(x = Month, y = Total_Sales, group = Region, fill = Region)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  scale_fill_manual(values = c("Region 1" = "orange", "Region 13" = "steelblue")) +
+  theme_minimal() +
+  labs(title = "Monthly Total Sales in Region 1 and Region 13 (2015-2017)",
+       x = "Month",
+       y = "Total Sales",
+       color = "Region") +
+  scale_y_continuous(labels = scales::comma) 
+ 
+
+```
+
+```{r}
+# Make Region 1 and Region 13 separate columns
+table_2 <- monthly_sales %>%
+  # Convert to wide format
+  pivot_wider(names_from = Region, values_from = Total_Sales) %>%  
+  # Filter where Region 13 has higher sales than Region 1
+  filter(`Region 13` > `Region 1`) %>% 
+  # Sort months chronologically
+  arrange(match(Month, month.abb))  
+
+# Rename columns for clarity
+colnames(table_2) <- c("Month", "Region 1 Sales", "Region 13 Sales")
+
+show(table_2)
+
+
+
+
+```
+
+```{r}
+library(knitr)
+
+
+# Filter for 2017 and exclude Region 3, 5, and 8
+filtered_df3 <- df %>%
+  filter(Year == 2017, 
+         !Region %in% c("Region 3", "Region 5", "Region 8"))
+
+# Calculate average profit per Customer_Segment and Product_Category
+table_3 <- filtered_df3 %>%
+  group_by(Customer_Segment, Product_Category) %>%
+  summarise(Average_Profit = mean(Profit, na.rm = TRUE)) %>%
+  arrange(desc(Average_Profit))  # Sort by highest average profit
+
+# Find the segment with the highest average profit
+highest_profit_segment <- table_3 %>% slice(1)
+
+# Display the table
+show(table_3)
+
+
+# Small businesses in the Technology category has the highest average profit
+
+```
+
+```{r}
+library(rvest)
+library(dplyr)
+library(stringr)
+
+# Load the website
+url <- "https://www.motor.no/aktuelt/motors-store-vintertest-av-rekkevidde-pa-elbiler/217132"
+webpage <- read_html(url)
+
+# Find the HTML table and convert it to a dataframe
+table_raw <- html_table(html_nodes(webpage, "div table")[[1]])
+
+# View raw data
+head(table_raw)
+
+# Clean and select relevant columns
+df2 <- table_raw %>%
+  rename(Car = 1, WLTP = 2, STOPP = 3) %>%  # Rename columns for clarity
+  mutate(WLTP = as.numeric(str_extract(WLTP, "\\d+")),  # Extract only numeric values from WLTP column
+         STOPP = as.numeric(str_extract(STOPP, "\\d+"))) %>%  # Extract only numeric values from STOPP column
+  filter(!is.na(WLTP) & !is.na(STOPP))  # Remove NA values
+
+# Create scatter plot with reference line
+ggplot(df2, aes(x = WLTP, y = STOPP)) +
+  geom_point(color = "black", size = 1) +  
+  geom_segment(aes(x = 0, y = 0, xend = 600, yend = 600), 
+               color = "red", linetype = "dashed", size = 1) +  # 1:1 reference line
+  labs(title = "Expected vs. Actual Range for Electric Cars",
+       subtitle = "Red dashed line = Expected mileage",
+       x = "WLTP (km) - Stated range",
+       y = "STOPP (km) - Actual range",
+       caption = "Data from Motor.no winter test") +
+  scale_x_continuous() +
+  scale_y_continuous(limits = c(0, 700)) +
+  theme_minimal()
+
+
+
+
+
+
+
+
+
+
+```
+
+```{r}
+
+
+# Linear regression
+model <- lm(STOPP ~ WLTP, data = df2)
+
+# Display regression results
+show(model)
+
+# Create scatter plot with regression line
+ggplot(df2, aes(x = WLTP, y = STOPP)) +
+  geom_point(color = "black", size = 1) +  
+  geom_segment(aes(x = 0, y = 0, xend = 600, yend = 600), 
+               color = "red", linetype = "dashed", size = 1) +  # 1:1 reference line
+  labs(title = "Expected vs. Actual Range for Electric Cars",
+       subtitle = "Red dashed line = Expected mileage",
+       x = "WLTP (km) - Stated range",
+       y = "STOPP (km) - Actual range",
+       caption = "Data from Motor.no winter test") +
+  geom_smooth(method = "lm", color = "black", se = FALSE) +  # Regression line 
+  scale_x_continuous() +
+  scale_y_continuous(limits = c(0, 700)) +
+  theme_minimal()
+
+
+```
+
+The two values from the customized line indicate how much the range would be if WLTP is 0, which is 26.6450. This does not make sense, so there is a statistical discrepancy here. The other value shows how much the range increases per 1 increase in WLTP. That is 0.8671, which means that the cars on average has a range of 86,71% of the WLTP range.
