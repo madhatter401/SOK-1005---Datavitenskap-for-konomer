@@ -1,0 +1,268 @@
+---
+title: "Sok-1005 Assignment 3"
+format: html
+editor: visual
+---
+
+## Quarto
+
+```{r}
+# Loading packs
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# Reading the excel file and navigating to the right spot
+df <- read_excel("Ukraine_Support_Tracker.xlsx", 
+                 sheet = "Fig 6. With Refugee Support, €", 
+                 skip = 11, col_names = FALSE)
+
+
+
+# naming the columnns
+colnames(df) <- c("Country", "Financial", "Humanitarian", "Military", "Refugee_cost_estimation", "Total")
+
+# removing rows that don't contain a country
+df <- df %>% filter(Country != "Total" & !is.na(Country))
+
+
+# Converting data to long format for stacking
+df_long <- df %>%
+  pivot_longer(cols = c(Financial, Humanitarian, Military, Refugee_cost_estimation),
+               names_to = "Aid_Type", values_to = "Amount")
+
+# Plot stacked bar chart
+ggplot(df_long, aes(x = reorder(Country, Amount, sum), y = Amount, fill = Aid_Type)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  scale_fill_manual(values = c("Financial" = "blue", "Humanitarian" = "green", "Military" = "red", "Refugee_cost_estimation" = "yellow")) +
+  labs(
+    title = "Figure 6. Total Bilateral Commitments Plus Refugee Costs (Billion Euros)",
+    x = "Country",
+    y = "Billion Euros",
+    fill = "Aid Type"
+  ) +
+  theme_minimal() + 
+  theme(
+    legend.position = c(0.7, 0.8),  # Plasserer legenden inne i plottet 
+    panel.grid.major.y = element_blank(),  # Fjerner horisontale grid-linjer
+  )
+
+
+
+
+
+
+
+```
+
+```{r}
+# Loading packs
+library(tidyverse)
+library(lubridate)
+
+# collecting the csv data
+url <- "https://raw.githubusercontent.com/ywchiu/rcookbook/master/chapter7/superstore_sales.csv"
+df <- read_csv(url)
+
+#  converting date to right format
+df <- df %>%
+  mutate(`Order Date` = as.Date(`Order Date`, format = "%Y/%m/%d"),  # Bruk YYYY/MM/DD format
+         Month = format(`Order Date`, "%b"))  # Ekstraher månedsnavn (Jan, Feb, etc.)
+
+#  Calculating sales by month
+sales_by_month <- df %>%
+  group_by(Month) %>%
+  summarise(Total_Sales = sum(Sales)) %>%
+  arrange(desc(Total_Sales))
+
+# printing result
+print(sales_by_month)
+
+#  Plotting total sales by month
+ggplot(sales_by_month, aes(x = Month, y = Total_Sales, fill = Month)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Sales per Month",
+       x = "Month", y = "Total Sales") +
+  theme_minimal() +
+  #removing the legend as it is not necessary here
+  theme(legend.position = "none")
+
+
+
+
+
+
+```
+
+```{r}
+# calculating sales by province
+sales_by_province <- df %>%
+  group_by(Province) %>%
+  summarise(Total_Sales = sum(Sales)) %>%
+  arrange(desc(Total_Sales))  # Sorter etter høyeste salg
+
+
+ggplot(sales_by_province, aes(x = reorder(Province, Total_Sales), y = Total_Sales, fill = Province)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +  # flipping the figure to make it more orderly
+  labs(title = "Total Sales by Province",
+       x = "Province", y = "Total Sales") +
+  theme_minimal() +
+  theme(legend.position = "none")  # removing legend as it is not necessary
+
+```
+
+```{r}
+# Finding top category per province
+top_category_per_province <- df %>%
+  group_by(Province, `Product Category`) %>%
+  summarise(Total_Sales = sum(Sales), .groups = "drop") %>%
+  group_by(Province) %>%  # Gruppér på nytt for å finne den beste i hver provins
+  slice_max(order_by = Total_Sales, n = 1)  # Velg den med høyest salg PER provins
+
+
+
+#  Making the plot
+ggplot(top_category_per_province, aes(x = reorder(Province, Total_Sales), y = Total_Sales, fill = `Product Category`)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "Top Selling Product Category per Province",
+       x = "Province", y = "Total Sales") +
+  theme_minimal()
+
+
+```
+
+```{r}
+# Load libraries
+library(gapminder)
+
+
+# Load the dataset
+data("gapminder")
+
+# Check dataset structure
+str(gapminder)
+
+# Filter for Asia and calculate min/max life expectancy per year
+life_exp_asia <- gapminder %>%
+  filter(continent == "Asia") %>%
+  group_by(year) %>%
+  summarise(
+    min_lifeExp = min(lifeExp),
+    max_lifeExp = max(lifeExp)
+  )
+
+# Display results
+print(life_exp_asia)
+
+```
+
+```{r}
+# Compute log differentials for life expectancy in Asia
+log_diff_asia <- life_exp_asia %>%
+  mutate(
+    log_min_change = log(min_lifeExp) - lag(log(min_lifeExp)),
+    log_max_change = log(max_lifeExp) - lag(log(max_lifeExp))
+  )
+
+# Display results
+print(log_diff_asia)
+
+# Determine which grew more over time
+total_growth_min <- sum(na.omit(log_diff_asia$log_min_change))
+total_growth_max <- sum(na.omit(log_diff_asia$log_max_change))
+
+cat("Total log growth for min life expectancy:", total_growth_min, "\n")
+cat("Total log growth for max life expectancy:", total_growth_max, "\n")
+
+if (total_growth_max > total_growth_min) {
+  cat("Maximum life expectancy grew more in Asia.\n")
+} else {
+  cat("Minimum life expectancy grew more in Asia.\n")
+}
+
+```
+
+```{r}
+# Compute average life expectancy and GDP per country
+avg_life_gdp <- gapminder %>%
+  group_by(country) %>%
+  summarise(
+    avg_lifeExp = mean(lifeExp),
+    avg_gdpPercap = mean(gdpPercap)
+  )
+
+# Select top 20 countries for life expectancy
+top_lifeExp <- avg_life_gdp %>%
+  arrange(desc(avg_lifeExp)) %>%
+  head(20)
+
+# Select top 20 countries for GDP per capita
+top_gdpPercap <- avg_life_gdp %>%
+  arrange(desc(avg_gdpPercap)) %>%
+  head(20)
+
+# Plot top 20 countries for life expectancy
+ggplot(top_lifeExp, aes(x = avg_lifeExp, y = reorder(country, avg_lifeExp))) +
+  geom_point(color = "blue", size = 3) +
+  labs(title = "Top 20 Countries by Average Life Expectancy",
+       x = "Average Life Expectancy", y = "Country") +
+  theme_minimal()
+
+# Plot top 20 countries for GDP per capita
+ggplot(top_gdpPercap, aes(x = avg_gdpPercap, y = reorder(country, avg_gdpPercap))) +
+  geom_point(color = "red", size = 3) +
+  labs(title = "Top 20 Countries by Average GDP per Capita",
+       x = "Average GDP per Capita", y = "Country") +
+  theme_minimal()
+
+```
+
+```{r}
+# Compute average values per country
+avg_life_gdp_continent <- gapminder %>%
+  group_by(country, continent) %>%
+  summarise(
+    avg_lifeExp = mean(lifeExp),
+    avg_gdpPercap = mean(gdpPercap),
+    .groups = "drop"
+  )
+
+# Scatter plot of life expectancy vs GDP per capita
+ggplot(avg_life_gdp_continent, aes(x = avg_gdpPercap, y = avg_lifeExp, color = continent)) +
+  geom_point(size = 3) +
+  scale_x_log10() +  # Logarithmic scale for GDP
+  labs(title = "Life Expectancy vs GDP per Capita",
+       x = "Average GDP per Capita (log scale)", y = "Average Life Expectancy") +
+  theme_minimal()
+
+```
+
+```{r}
+# Compute life expectancy gain per country
+life_exp_gain <- gapminder %>%
+  group_by(country) %>%
+  mutate(lifeExp_gain = lifeExp - first(lifeExp)) %>%
+  ungroup()
+
+# Find the country with the sharpest 5-year drop in life expectancy
+life_exp_drop <- gapminder %>%
+  group_by(continent, country) %>%
+  arrange(year) %>%
+  mutate(lifeExp_change = lifeExp - lag(lifeExp)) %>%
+  ungroup() %>%
+  filter(!is.na(lifeExp_change)) %>%
+  arrange(lifeExp_change)  # Sort by worst drop
+
+# Identify the country with the worst drop
+worst_drop <- life_exp_drop %>%
+  slice_min(order_by = lifeExp_change, n = 1)
+
+# Display results
+print(worst_drop)
+
+
+```
